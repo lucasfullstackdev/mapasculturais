@@ -14,6 +14,19 @@ const STATUS_VALID = 'valid';
 
 class Module extends \MapasCulturais\EvaluationMethod
 {
+    protected function _export(EvaluationMethodConfiguration $evaluation_method_configuration): array 
+    { 
+        return [
+            'sections' => $evaluation_method_configuration->sections,
+            'criteria' => $evaluation_method_configuration->criteria
+        ];
+    }
+
+    protected function _import(EvaluationMethodConfiguration $evaluation_method_configuration, array $data) 
+    {
+        $evaluation_method_configuration->sections = $data['sections'];
+        $evaluation_method_configuration->criteria = $data['criteria'];
+    }
 
     protected function _getDefaultStatuses(EvaluationMethodConfiguration $evaluation_method_configuration): array
     {
@@ -117,6 +130,7 @@ class Module extends \MapasCulturais\EvaluationMethod
         $cfg = $evaluation->getEvaluationMethodConfiguration();
         
         foreach(($cfg->sections ?? []) as $section) {
+            $max_non_eliminatory = $section->maxNonEliminatory ?? false;
             $number_max_non_liminatory = $section->numberMaxNonEliminatory ?? 0;
             $non_eliminatory_count = 0;
 
@@ -149,7 +163,7 @@ class Module extends \MapasCulturais\EvaluationMethod
                     }
                 }
 
-                if($non_eliminatory_count > $number_max_non_liminatory){
+                if($max_non_eliminatory && $non_eliminatory_count > $number_max_non_liminatory){
                     $result = 'invalid';
                     break;
                 }

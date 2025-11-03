@@ -842,6 +842,10 @@ return [
         __exec("CREATE INDEX job_search_idx ON job (next_execution_timestamp, iterations_count, status);");
     },
 
+    'remove comment of table job' => function () {
+        __exec("COMMENT ON COLUMN job.metadata is ''");
+    },
+
     'alter job.metadata comment' => function () {
         __exec("COMMENT ON COLUMN job.metadata IS '(DC2Type:json)';");
     },
@@ -1347,6 +1351,23 @@ return [
             $app->log->debug("Aplicado Índice Único na tabela auxiliar {$table}");
         }
     },
+
+    'adiciona coluna pk à tabela de job' => function () {
+        __exec('DROP SEQUENCE IF EXISTS job_pk_seq');
+        __exec("CREATE SEQUENCE job_pk_seq
+                                START WITH 1
+                                INCREMENT BY 1
+                                NO MINVALUE
+                                NO MAXVALUE
+                                CACHE 1;");
+                                
+        __exec("ALTER TABLE job ADD COLUMN pk bigint not null DEFAULT nextval('job_pk_seq'::regclass)");
+        
+        __exec("ALTER TABLE job DROP CONSTRAINT job_pkey");
+        __exec("ALTER TABLE job ADD CONSTRAINT job_pk PRIMARY KEY (pk);");
+
+    },
+
     /// MIGRATIONS - DATA CHANGES =========================================
 
     'migrate gender' => function() use ($conn) {
@@ -1946,7 +1967,7 @@ $$
         __try("DROP MATERIALIZED VIEW evaluations");
     },
 
-    'Recria view evaluations!!!!!!' => function() use($conn) {
+    'Recria view evaluations!!!!!!!' => function() use($conn) {
         __try("DROP VIEW IF EXISTS evaluations");
 
         $conn->executeQuery("
@@ -2006,7 +2027,7 @@ $$
                         JOIN evaluation_method_configuration emc
                             ON emc.opportunity_id = r2.opportunity_id
                     WHERE                          
-                        r2.status = 1
+                        r2.status >= 1
                 ) AS evaluations_view 
                 GROUP BY
                     registration_id,

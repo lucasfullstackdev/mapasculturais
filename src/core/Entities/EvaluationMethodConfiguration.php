@@ -15,9 +15,11 @@ use Opportunities\Jobs\UpdateSummaryCaches;
  * @property \MapasCulturais\Entities\Opportunity $opportunity Opportunity
  * @property \DateTime $evaluationFrom
  * @property \DateTime $evaluationTo
+ * @property string $name
+ * @property \MapasCulturais\Definitions\EntityType $type
  * 
  * @property-read \MapasCulturais\Definitions\EvaluationMethod $definition The evaluation method definition object
- * @property-read \MapasCulturais\EvaluationMethod $evaluationMethod The evaluation method plugin object
+ * @property-read \MapasCulturais\EvaluationMethod $evaluationMethod The evaluation method module object
  * @property-read bool $useCommitteeGroups
  * @property-read bool $evaluateSelfApplication
  * @property-read string $summaryCacheKey Chave do cache do resumo das avaliações
@@ -338,6 +340,10 @@ class EvaluationMethodConfiguration extends \MapasCulturais\Entity {
         $data = [
             'evaluations' => []
         ];
+
+        if(!$em) {
+            return $data;
+        }
         
         // Conta as inscrições avaliadas por consolidatedResult
         $query = $app->em->createQuery("
@@ -364,14 +370,15 @@ class EvaluationMethodConfiguration extends \MapasCulturais\Entity {
             }
         }
 
-        // Conta as inscrições que tenham o status pendente
+        // Conta as inscrições que não tenham sido totalmente avaliadas
         $query = $app->em->createQuery("
             SELECT 
                 count(r) as qtd 
             FROM 
                 MapasCulturais\\Entities\\Registration r  
             WHERE 
-                r.opportunity = :opp AND r.status = 1
+                r.opportunity = :opp AND r.status = 1 AND
+                (r.consolidatedResult is null or r.consolidatedResult in ('', '0'))
         ");
 
         $query->setParameters([
@@ -400,7 +407,7 @@ class EvaluationMethodConfiguration extends \MapasCulturais\Entity {
         // Conta as inscrições com avaliações iniciadas
         $query = $app->em->createQuery("
             SELECT 
-                COUNT(re) AS qtd 
+                COUNT(DISTINCT r.id) AS qtd 
             FROM 
                 MapasCulturais\\Entities\\RegistrationEvaluation re
             JOIN 

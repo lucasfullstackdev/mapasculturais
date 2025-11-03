@@ -285,6 +285,11 @@ class Module extends \MapasCulturais\Module{
                 return null;
             }
 
+            if($this->isAppealPhase) {
+                $value = $this->parent;
+                return;
+            }
+
             $this->enableCacheGetterResult('previousPhase');
 
             $last_phase = $this->isLastPhase ? $this : $this->lastPhase;
@@ -1546,6 +1551,10 @@ class Module extends \MapasCulturais\Module{
             $phase = null;
             $phases = $this->opportunity->allPhases;
 
+            if($this->opportunity && $this->opportunity->isAppealPhase) {
+                return;
+            }
+
             // procura a última fase (opportunity) sem método de avaliação/
             // que não seja a fase de publicação de resultado.
             for($i = count($phases) -1; $i >=0; $i--) {
@@ -1554,10 +1563,6 @@ class Module extends \MapasCulturais\Module{
                     $phase = $_phase;
                     break;
                 }
-            }
-
-            if (!$phase && $this->opportunity->status == Opportunity::STATUS_APPEAL_PHASE) {
-                $phase = $this->opportunity;
             }
 
             if(!$phase) {
@@ -1596,7 +1601,7 @@ class Module extends \MapasCulturais\Module{
             // se a próxima fase for a última fase e a fase atual não for uma fase de coleta de dados, apaga a fase atual
             if ($next_phase->isLastPhase){
                 if (!$opportunity->isDataCollection) {
-                    $opportunity->delete(true);
+                    $opportunity->destroy();
                     $previous_phase->fixNextPhaseRegistrationIds();
                 }
 
@@ -1771,11 +1776,11 @@ class Module extends \MapasCulturais\Module{
                     }
                     $this->save(true);
                 }
-                $app->disableAccessControl();
 
+                $app->enableAccessControl();
             });
 
-            $app->hook('entity(Registration).update:after', function() use($app){
+            $app->hook('entity(Registration).save:after', function() use($app){
                 /** @var Registration $this */
 
                 $app->disableAccessControl();
@@ -1880,7 +1885,7 @@ class Module extends \MapasCulturais\Module{
                 "baseUrl" => $registration->singleUrl,
                 "opportunityId" => $opportunity->id,
                 "opportunityTitle" => $opportunity->firstPhase->name,
-                "registrationId" => $registration->id,
+                "registrationNumber" => $registration->number,
                 "registrationUrl" => $registration->singleUrl
             ];
             $email_params = [

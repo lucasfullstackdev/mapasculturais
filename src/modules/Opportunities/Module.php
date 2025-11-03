@@ -656,13 +656,9 @@ class Module extends \MapasCulturais\Module{
         // Atualiza a coluna metadata da relação do agente com a avaliação com od dados do summary das avaliações no momento da alteração de status.
         $app->hook("entity(RegistrationEvaluation).setStatus(<<*>>)", function() use ($app) {
             /** @var \MapasCulturais\Entities\RegistrationEvaluation $this */
-            $opportunity = $this->registration->opportunity;
 
-            $user = $app->user;
-            if ($opportunity->canUser('@control')) {
-                $user = $this->user;
-            }
-
+            $user = $this->user;
+            
             if ($em = $this->getEvaluationMethodConfiguration()) {
                 $em->getUserRelation($user)->updateSummary();
             }
@@ -841,16 +837,16 @@ class Module extends \MapasCulturais\Module{
             }
 
             if ($opportunity && ($opportunity->publishedRegistrations || $this->opportunity->firstPhase->isContinuousFlow)) {
+                $proponent_type_seals = $opportunity->proponentSeals;
                 $proponent_type = $this->proponentType;
                 $owner = $this->owner;
                 $categories_seals = $opportunity->categorySeals;
                 $category = $this->category;
+                $proponent_typesTo_agents_Map = $app->config['registration.proponentTypesToAgentsMap'];
+                $agent_type = $proponent_typesTo_agents_Map[$proponent_type] ?? "owner";
 
-                if ($proponent_type) {
-                    $proponent_seals = $seals->{$proponent_type};
-                    $proponent_typesTo_agents_Map = $app->config['registration.proponentTypesToAgentsMap'];
-                    $agent_type = $proponent_typesTo_agents_Map[$proponent_type] ?? null;
-
+                if ($proponent_type  && $proponent_type_seals) {
+                    $proponent_seals = $proponent_type_seals->{$proponent_type};
 
                     if ($agent_type == "owner") {
                         $relations = $owner->getSealRelations();
@@ -866,39 +862,26 @@ class Module extends \MapasCulturais\Module{
                             $self->removeSeals($app, $relations, $proponent_seals);
                         }
                     }
-
-                    // Se a inscrição tiver "tipo de proponente" e "categoria", remover o selo verificador da categoria, caso possua.
-                    if($category) {
-                        if (isset($categories_seals->{$category})) {
-                            $category_seals = $categories_seals->{$category};
-
-                             // Verifica se a opção "Habilitar a vinculação de agente coletivo" esta ativa
-                            if($opportunity->firstPhase->useAgentRelationColetivo == 'required') {
-                                if ($agent_type == "coletivo") {
-                                    $agent_relations = $this->getAgentRelations();
-    
-                                    foreach ($agent_relations as $agent_relation) {
-                                        $agent = $agent_relation->agent;
-                                        $relations = $agent->getSealRelations();
-                                        $self->removeSeals($app, $relations, $category_seals);
-                                    }
-                                }
-                            }
-
-                            if ($agent_type == "owner") {
-                                $relations = $owner->getSealRelations();
-                                $self->removeSeals($app, $relations, $category_seals);
-                            }
-                        }
-                    }
                 }
 
-                // Se tiver apenas "categoria" e não houver "tipo de proponente", remover selo verificador (caso configurado) do agente individual
-                if($category && !$proponent_type) {
-                    if (isset($categories_seals->{$category})) {
-                        $category_seals = $categories_seals->{$category};
+                // Se tiver "categoria" remover selo verificador (caso configurado) do agente individual
+                if($category && $categories_seals && $categories_seals->{$category}) {
+                    $category_seals = $categories_seals->{$category};
+                    if($agent_type == 'owner'){
                         $relations = $owner->getSealRelations();
                         $self->removeSeals($app, $relations, $category_seals);
+
+                    }
+
+                    // Verifica se a opção "Habilitar a vinculação de agente coletivo" esta ativa
+                    if($proponent_type && $opportunity->firstPhase->useAgentRelationColetivo == 'required' && $agent_type == "coletivo") {
+                        $agent_relations = $this->getAgentRelations();
+
+                        foreach ($agent_relations as $agent_relation) {
+                            $agent = $agent_relation->agent;
+                            $relations = $agent->getSealRelations();
+                            $self->removeSeals($app, $relations, $category_seals);
+                        }
                     }
                 }
             }
@@ -1036,6 +1019,15 @@ class Module extends \MapasCulturais\Module{
                 }
             }
         });
+
+        $app->hook('template(opportunity.allEvaluations.entityTableSortOptions)', function(&$sort_options) {
+            $sort_options = [
+                [ 'value' => 'sentTimestamp DESC',   'label' => i::__('mais recentes primeiro') ],
+                [ 'value' => 'sentTimestamp ASC',    'label' => i::__('mais antigas primeiro') ],
+                [ 'value' => 'updateTimestamp DESC', 'label' => i::__('modificadas recentemente') ],
+                [ 'value' => 'updateTimestamp ASC',  'label' => i::__('modificadas há mais tempo') ],
+            ];
+        });
     }
 
     function register(){
@@ -1160,7 +1152,7 @@ class Module extends \MapasCulturais\Module{
                 }
             }
             if(!$has_new_seal){
-                $agent->createSealRelation($seal);
+                $agent->createSealRelation($seal, agent: $agent);
             }
         }
     }
