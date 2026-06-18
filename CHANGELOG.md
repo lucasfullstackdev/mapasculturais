@@ -1,5 +1,7 @@
 # Changelog
 
+estou alterando o arquivo
+
 Todas as mudanças notáveis no projeto serão documentadas neste arquivo.
 
 O formato é baseado no [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/)
